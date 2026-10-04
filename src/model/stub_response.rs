@@ -12,25 +12,25 @@ pub enum Method {
 
 #[derive(Deserialize, Debug)]
 #[serde(untagged)]
-enum ResponseBody {
+pub enum ResponseBody {
     Json(HashMap<String, serde_json::Value>),
     Text(String),
 }
 
 #[derive(Deserialize, Debug)]
 pub struct Response {
-    status: u16,
-    body: Option<ResponseBody>,
-    headers: Option<HashMap<String, String>>,
+    pub status: u16,
+    pub body: Option<ResponseBody>,
+    pub headers: Option<HashMap<String, String>>,
 }
 
 #[derive(Deserialize, Debug)]
 pub struct Request {
-    url: String,
-    method: Method,
+    pub url: String,
+    pub method: Method,
 }
 #[derive(Deserialize, Debug)]
 pub struct StubResponse {
-    request: Request,
-    response: Response,
+    pub request: Request,
+    pub response: Response,
 }

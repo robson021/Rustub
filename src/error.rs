@@ -4,7 +4,4 @@ use thiserror::Error;
 pub enum FileError {
     #[error("File does not exist: {0}")]
     FileDoesNotExist(String),
-
-    #[error("Failed to check file existence in the path '{0}'.")]
-    CouldNotCheckFile(String),
 }

@@ -1,20 +1,26 @@
 mod config;
 mod error;
 mod file_utils;
+mod model;
 
-use crate::config::ServerConfig;
 use axum::response::Redirect;
 use axum::routing::get;
 use axum::{Json, Router};
-use log::info;
+use log::{error, info};
 
 #[tokio::main]
 async fn main() {
     config::setup_logger();
-    let cfg: ServerConfig = config::read_config("./config/default/server.yaml").unwrap();
-    info!("Server config: {:?}", cfg);
+    let config = match config::read_config("./config/default/server.yaml") {
+        Ok(cfg) => cfg,
+        Err(e) => {
+            error!("{}", e);
+            return;
+        }
+    };
+    info!("Server config: {:?}", config);
 
-    let host = format!("{}:{}", cfg.address, cfg.port);
+    let host = format!("{}:{}", config.address, config.port);
 
     let app = Router::new()
         .route("/", get(Redirect::to("/hello")))

@@ -1,4 +1,5 @@
 use crate::file_utils;
+use crate::model::server_config::ServerConfig;
 use log::LevelFilter;
 use log4rs::append::console::{ConsoleAppender, Target};
 use log4rs::config::{Appender, Root};
@@ -6,12 +7,6 @@ use log4rs::encode::pattern::PatternEncoder;
 use serde::Deserialize;
 use std::error::Error;
 use std::io::BufReader;
-
-#[derive(Debug, Deserialize)]
-pub struct ServerConfig {
-    pub address: String,
-    pub port: u16,
-}
 
 #[derive(Debug, Deserialize)]
 struct Config {

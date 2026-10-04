@@ -1,5 +1,6 @@
 use crate::file_utils;
 use crate::model::server_config::ServerConfig;
+use crate::model::stub_response::*;
 use anyhow::Result;
 use log::LevelFilter;
 use log4rs::append::console::{ConsoleAppender, Target};
@@ -13,7 +14,11 @@ struct Config {
     server: ServerConfig,
 }
 
-pub(crate) fn read_config(path: &str) -> Result<ServerConfig> {
+pub(crate) fn read_stubs_config(_path: &str) -> Result<StubResponse> {
+    todo!()
+}
+
+pub(crate) fn read_server_config(path: &str) -> Result<ServerConfig> {
     let file = file_utils::open_file(path)?;
     let reader = BufReader::new(file);
     let config: Config = serde_yaml::from_reader(reader)?;

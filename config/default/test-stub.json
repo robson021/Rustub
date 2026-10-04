@@ -2,7 +2,7 @@
   {
     "request": {
       "method": "GET",
-      "url": "/hello"
+      "url": "/test"
     },
     "response": {
       "status": 200,

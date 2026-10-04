@@ -2,26 +2,40 @@ use crate::file_utils;
 use crate::model::server_config::ServerConfig;
 use crate::model::stub_response::*;
 use anyhow::Result;
-use log::LevelFilter;
+use log::{LevelFilter, debug, info, warn};
 use log4rs::append::console::{ConsoleAppender, Target};
 use log4rs::config::{Appender, Root};
 use log4rs::encode::pattern::PatternEncoder;
 use serde::Deserialize;
-use std::io::BufReader;
 
 #[derive(Debug, Deserialize)]
 struct Config {
     server: ServerConfig,
 }
 
-pub(crate) fn read_stubs_config(_path: &str) -> Result<StubResponse> {
-    todo!()
+pub(crate) fn read_stubs_config(path: &str) -> Result<Vec<StubResponse>> {
+    let files = file_utils::list_all_files_with_suffix(path, "-stub.json")?;
+    info!("Found {} stub files: {:?}", files.len(), files);
+    let mut stubs = vec![];
+    for path in files {
+        let path_buf = path.to_str();
+        if path_buf.is_none() {
+            warn!("Skipping invalid stub file path: {:?}", path);
+            continue;
+        }
+        let path = path_buf.unwrap();
+        debug!("Reading stub file: {}", path);
+        let file = file_utils::open_file(path)?;
+        let stub: Vec<StubResponse> = serde_json::from_reader(file)?;
+        stubs.push(stub);
+    }
+    let stubs = stubs.into_iter().flatten().collect();
+    Ok(stubs)
 }
 
 pub(crate) fn read_server_config(path: &str) -> Result<ServerConfig> {
     let file = file_utils::open_file(path)?;
-    let reader = BufReader::new(file);
-    let config: Config = serde_yaml::from_reader(reader)?;
+    let config: Config = serde_yaml::from_reader(file)?;
     Ok(config.server)
 }
 

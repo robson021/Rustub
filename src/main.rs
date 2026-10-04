@@ -1,5 +1,8 @@
 mod config;
+mod error;
+mod file_utils;
 
+use crate::config::ServerConfig;
 use axum::response::Redirect;
 use axum::routing::get;
 use axum::{Json, Router};
@@ -8,10 +11,10 @@ use log::info;
 #[tokio::main]
 async fn main() {
     config::setup_logger();
+    let cfg: ServerConfig = config::read_config("./config/default/server.yaml").unwrap();
+    info!("Server config: {:?}", cfg);
 
-    let address = "127.0.0.1";
-    let port = 8080;
-    let host = format!("{}:{}", address, port);
+    let host = format!("{}:{}", cfg.address, cfg.port);
 
     let app = Router::new()
         .route("/", get(Redirect::to("/hello")))

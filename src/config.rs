@@ -1,13 +1,28 @@
+use crate::file_utils;
 use log::LevelFilter;
 use log4rs::append::console::{ConsoleAppender, Target};
 use log4rs::config::{Appender, Root};
 use log4rs::encode::pattern::PatternEncoder;
-use serde::{Deserialize, Serialize};
+use serde::Deserialize;
+use std::error::Error;
+use std::io::BufReader;
 
-#[derive(Serialize, Deserialize, PartialEq, Debug)]
-struct ServerConfig {
-    address: String,
-    port: u16,
+#[derive(Debug, Deserialize)]
+pub struct ServerConfig {
+    pub address: String,
+    pub port: u16,
+}
+
+#[derive(Debug, Deserialize)]
+struct Config {
+    server: ServerConfig,
+}
+
+pub(crate) fn read_config(path: &str) -> Result<ServerConfig, Box<dyn Error>> {
+    let file = file_utils::open_file(path)?;
+    let reader = BufReader::new(file);
+    let config: Config = serde_yaml::from_reader(reader)?;
+    Ok(config.server)
 }
 
 pub(crate) fn setup_logger() {

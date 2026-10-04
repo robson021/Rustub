@@ -6,6 +6,7 @@ mod model;
 use crate::model::stub_response::Method;
 use anyhow::Result;
 use axum::response::Redirect;
+use axum::routing::{delete, patch, post, put};
 use axum::{
     Json, Router, body::Body, extract::Path, http::StatusCode, response::Response, routing::get,
 };
@@ -40,6 +41,8 @@ async fn main() -> Result<()> {
                     Some(Path(id)) => id.to_string(),
                     None => "No ID".to_string(),
                 };
+
+                // todo use custom payload
                 let payload = format!(r#"{{"entity_id": "{entity_id}"}}"#);
 
                 // todo add headers
@@ -50,15 +53,13 @@ async fn main() -> Result<()> {
                     .unwrap()
             }
         };
-        // todo: add custom method mapping
         match req.method {
-            Method::GET => {}
-            Method::POST => {}
-            Method::PUT => {}
-            Method::DELETE => {}
-            Method::PATCH => {}
+            Method::GET => app = app.route(&req.url, get(handler)),
+            Method::POST => app = app.route(&req.url, post(handler)),
+            Method::PUT => app = app.route(&req.url, put(handler)),
+            Method::DELETE => app = app.route(&req.url, delete(handler)),
+            Method::PATCH => app = app.route(&req.url, patch(handler)),
         }
-        app = app.route(&req.url, get(handler));
     }
 
     let listener = tokio::net::TcpListener::bind(host).await?;

@@ -1,0 +1,29 @@
+[
+  {
+    "request": {
+      "method": "GET",
+      "url": "/hello"
+    },
+    "response": {
+      "status": 200,
+      "body": "Hello, world!",
+      "headers": {
+        "Content-Type": "text/plain"
+      }
+    }
+  },
+  {
+    "request": {
+      "method": "GET",
+      "url": "/api/user/:id"
+    },
+    "response": {
+      "status": 200,
+      "body": {
+        "id": 123,
+        "username": "user_123",
+        "role": "admin"
+      }
+    }
+  }
+]

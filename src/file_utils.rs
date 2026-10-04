@@ -1,9 +1,9 @@
 use crate::error::FileError;
-use std::error::Error;
+use anyhow::Result;
 use std::fs::File;
 use std::path::Path;
 
-pub(crate) fn open_file(path: &str) -> Result<File, Box<dyn Error>> {
+pub(crate) fn open_file(path: &str) -> Result<File> {
     let path = match Path::new(path).exists() {
         true => Path::new(&path),
         false => {

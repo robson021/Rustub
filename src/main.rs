@@ -8,10 +8,12 @@ use axum::routing::get;
 use axum::{Json, Router};
 use log::{error, info};
 
+const DEFAULT_CONFIG_PATH: &str = "./config/default/server.yaml";
+
 #[tokio::main]
 async fn main() {
     config::setup_logger();
-    let config = match config::read_config("./config/default/server.yaml") {
+    let config = match config::read_config(DEFAULT_CONFIG_PATH) {
         Ok(cfg) => cfg,
         Err(e) => {
             error!("{}", e);

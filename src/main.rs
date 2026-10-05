@@ -5,6 +5,7 @@ mod http_handlers;
 mod model;
 
 use crate::http_handlers::{build_response, method_not_allowed};
+use crate::model::stub_response::StubResponse;
 use anyhow::Result;
 use axum::http::Method;
 use axum::response::Redirect;
@@ -27,7 +28,15 @@ async fn main() -> Result<()> {
     info!("Stubs config: {:?}", stubs_config);
 
     let host = &format!("{}:{}", server_config.address, server_config.port);
+    let listener = tokio::net::TcpListener::bind(host).await?;
+    let app = build_routes_for_stubs(stubs_config);
 
+    info!("Running on: http://{}", host);
+    axum::serve(listener, app).await?;
+    Ok(())
+}
+
+fn build_routes_for_stubs(stubs_config: Vec<StubResponse>) -> Router {
     let mut app = Router::new()
         .route("/", get(Redirect::to("/hello")))
         .route("/hello", get(Json("Hello, World!")));
@@ -59,10 +68,5 @@ async fn main() -> Result<()> {
             _ => app = app.route(&req.url, any(method_not_allowed)),
         }
     }
-
-    let listener = tokio::net::TcpListener::bind(host).await?;
-
-    info!("Running on: http://{}", host);
-    axum::serve(listener, app).await?;
-    Ok(())
+    app
 }

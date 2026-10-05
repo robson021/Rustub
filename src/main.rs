@@ -3,7 +3,7 @@ mod error;
 mod file_utils;
 mod model;
 
-use crate::model::stub_response::Method;
+use crate::model::stub_response::{Method, Response as StubResponse};
 use anyhow::Result;
 use axum::response::Redirect;
 use axum::routing::{delete, patch, post, put};
@@ -32,21 +32,13 @@ async fn main() -> Result<()> {
         .route("/hello", get(Json("Hello, World!")));
 
     for stub in stubs_config {
-        let req = stub.request;
         let res = stub.response;
-
-        let handler = move |_path_params: Option<Path<u32>>| async move {
-            let mut builder = Response::builder().status(StatusCode::from_u16(res.status).unwrap());
-            if let Some(headers) = res.headers {
-                for (key, value) in headers {
-                    builder = builder.header(key, value);
-                }
-            }
-            match res.body {
-                Some(payload) => builder.body(Body::from(payload.to_string())).unwrap(),
-                None => builder.body(Body::empty()).unwrap(),
-            }
+        let handler = move |_path_params: Option<Path<u32>>| {
+            let res = res.clone();
+            async move { build_response(res).await }
         };
+
+        let req = stub.request;
         match req.method {
             Method::GET => app = app.route(&req.url, get(handler)),
             Method::POST => app = app.route(&req.url, post(handler)),
@@ -61,4 +53,19 @@ async fn main() -> Result<()> {
     info!("Running on: http://{}", host);
     axum::serve(listener, app).await?;
     Ok(())
+}
+
+async fn build_response(res: StubResponse) -> Response {
+    let mut builder = Response::builder().status(StatusCode::from_u16(res.status).unwrap());
+
+    if let Some(headers) = res.headers {
+        for (key, value) in headers {
+            builder = builder.header(key, value);
+        }
+    }
+
+    match res.body {
+        Some(payload) => builder.body(Body::from(payload.to_string())).unwrap(),
+        None => builder.body(Body::empty()).unwrap(),
+    }
 }

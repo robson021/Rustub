@@ -10,7 +10,7 @@ use axum::http::Method;
 use axum::response::Redirect;
 use axum::routing::{any, delete, patch, post, put};
 use axum::{Json, Router, extract::Path, routing::get};
-use log::info;
+use log::{debug, info};
 
 const DEFAULT_STUB_CONFIG_PATH: &str = "./config/default";
 const DEFAULT_SERVER_CONFIG_PATH: &str = "./config/default/server.yaml";
@@ -32,13 +32,16 @@ async fn main() -> Result<()> {
         .route("/hello", get(Json("Hello, World!")));
 
     for stub in stubs_config {
+        let req = stub.request;
         let res = stub.response;
-        let handler = move |_path_params: Option<Path<u32>>| {
+        let url = req.url.clone();
+
+        let handler = move |path_params: Option<Path<String>>| {
+            debug!("Path params for {}: {:?}", url, path_params);
             let res = res.clone();
-            async move { build_response(res).await }
+            async move { build_response(res, path_params, None).await }
         };
 
-        let req = stub.request;
         match req.method {
             Method::GET => app = app.route(&req.url, get(handler)),
             Method::POST => app = app.route(&req.url, post(handler)),

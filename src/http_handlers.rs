@@ -1,8 +1,13 @@
 use crate::model::stub_response::Response as StubResponse;
 use axum::http::StatusCode;
 use axum::{body::Body, extract::Path, response::Response};
+use std::collections::HashMap;
 
-pub async fn build_response(res: StubResponse) -> Response {
+pub async fn build_response(
+    res: StubResponse,
+    _path: Option<Path<String>>,
+    _query: Option<HashMap<String, String>>,
+) -> Response {
     let mut builder = Response::builder().status(StatusCode::from_u16(res.status).unwrap());
 
     if let Some(headers) = res.headers {
@@ -17,7 +22,7 @@ pub async fn build_response(res: StubResponse) -> Response {
     }
 }
 
-pub async fn method_not_allowed(_path: Option<Path<u32>>) -> Response {
+pub async fn method_not_allowed(_path: Option<Path<String>>) -> Response {
     Response::builder()
         .status(StatusCode::METHOD_NOT_ALLOWED)
         .body(Body::empty())
@@ -50,7 +55,7 @@ mod tests {
             headers: Some(headers),
         };
 
-        let resp = build_response(res).await;
+        let resp = build_response(res, None, None).await;
         assert_eq!(resp.status(), StatusCode::OK);
         let ct = resp
             .headers()
@@ -83,7 +88,7 @@ mod tests {
             headers: Some(headers),
         };
 
-        let resp = build_response(res).await;
+        let resp = build_response(res, None, None).await;
         assert_eq!(resp.status(), StatusCode::CREATED);
         let ct = resp
             .headers()
@@ -106,7 +111,7 @@ mod tests {
             headers: None,
         };
 
-        let resp = build_response(res).await;
+        let resp = build_response(res, None, None).await;
         assert_eq!(resp.status(), StatusCode::NO_CONTENT);
         let expected: Vec<u8> = Vec::new();
         assert!(expected.is_empty());

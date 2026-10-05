@@ -1,4 +1,5 @@
 use serde::Deserialize;
+use serde_json::Value;
 use std::collections::HashMap;
 
 #[derive(Deserialize, Debug)]
@@ -11,16 +12,9 @@ pub enum Method {
 }
 
 #[derive(Deserialize, Debug)]
-#[serde(untagged)]
-pub enum ResponseBody {
-    Json(HashMap<String, serde_json::Value>),
-    Text(String),
-}
-
-#[derive(Deserialize, Debug)]
 pub struct Response {
     pub status: u16,
-    pub body: Option<ResponseBody>,
+    pub body: Option<Value>,
     pub headers: Option<HashMap<String, String>>,
 }
 

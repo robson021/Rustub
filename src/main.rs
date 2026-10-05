@@ -35,22 +35,16 @@ async fn main() -> Result<()> {
         let req = stub.request;
         let res = stub.response;
 
-        let handler = move |path_params: Option<Path<u32>>| {
-            async move {
-                let entity_id = match path_params {
-                    Some(Path(id)) => id.to_string(),
-                    None => "No ID".to_string(),
-                };
-
-                // todo use custom payload
-                let payload = format!(r#"{{"entity_id": "{entity_id}"}}"#);
-
-                // todo add headers
-                Response::builder()
-                    .status(StatusCode::from_u16(res.status).unwrap())
-                    .header("Content-Type", "application/json")
-                    .body(Body::from(payload))
-                    .unwrap()
+        let handler = move |_path_params: Option<Path<u32>>| async move {
+            let mut builder = Response::builder().status(StatusCode::from_u16(res.status).unwrap());
+            if let Some(headers) = res.headers {
+                for (key, value) in headers {
+                    builder = builder.header(key, value);
+                }
+            }
+            match res.body {
+                Some(payload) => builder.body(Body::from(payload.to_string())).unwrap(),
+                None => builder.body(Body::empty()).unwrap(),
             }
         };
         match req.method {

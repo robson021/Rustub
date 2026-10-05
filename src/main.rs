@@ -9,8 +9,9 @@ use anyhow::Result;
 use axum::http::Method;
 use axum::response::Redirect;
 use axum::routing::{any, delete, patch, post, put};
-use axum::{Json, Router, extract::Path, routing::get};
+use axum::{Json, Router, body::Body, extract::Path, http::Request, routing::get};
 use log::{debug, info};
+use std::collections::HashMap;
 
 const DEFAULT_STUB_CONFIG_PATH: &str = "./config/default";
 const DEFAULT_SERVER_CONFIG_PATH: &str = "./config/default/server.yaml";
@@ -36,10 +37,17 @@ async fn main() -> Result<()> {
         let res = stub.response;
         let url = req.url.clone();
 
-        let handler = move |path_params: Option<Path<String>>| {
-            debug!("Path params for {}: {:?}", url, path_params);
+        let handler = move |path_params: Option<Path<String>>, request: Request<Body>| {
+            let query_map = request
+                .uri()
+                .query()
+                .and_then(|q| serde_urlencoded::from_str::<HashMap<String, String>>(q).ok());
+            debug!(
+                "Path params for {}: {:?}; query: {:?}",
+                url, path_params, query_map
+            );
             let res = res.clone();
-            async move { build_response(res, path_params, None).await }
+            async move { build_response(res, path_params, query_map).await }
         };
 
         match req.method {

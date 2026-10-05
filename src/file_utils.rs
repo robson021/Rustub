@@ -18,19 +18,20 @@ pub(crate) fn open_file(path: &str) -> Result<BufReader<File>> {
 }
 
 pub(crate) fn list_all_files_with_suffix(path: &str, suffix: &str) -> Result<Vec<PathBuf>> {
-    let mut files = vec![];
-    WalkDir::new(path)
+    let files: Vec<PathBuf> = WalkDir::new(path)
         .into_iter()
-        .filter_map(|e| e.ok())
-        .filter(|dir_entry| dir_entry.path().is_file())
-        .for_each(|dir_entry| {
-            let path = dir_entry.path();
-            if let Some(file_name) = path.file_name().and_then(|n| n.to_str())
-                && file_name.ends_with(suffix)
-            {
-                files.push(path.to_owned());
-            }
-        });
+        .filter_map(|result| result.ok())
+        .filter(|entry| entry.file_type().is_file())
+        .filter_map(|entry| {
+            entry
+                .path()
+                .file_name()
+                .and_then(|n| n.to_str())
+                .filter(|name| name.ends_with(suffix))
+                .map(|_| entry.path().to_path_buf())
+        })
+        .collect();
+
     Ok(files)
 }
 
@@ -69,4 +70,3 @@ mod tests {
         assert!(found, "expected test-stub.json to be present");
     }
 }
-

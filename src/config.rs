@@ -77,6 +77,4 @@ mod tests {
         assert_eq!(cfg.address, "127.0.0.1");
         assert_eq!(cfg.port, 8080);
     }
-
 }
-

@@ -1,15 +1,15 @@
 mod config;
 mod error;
 mod file_utils;
+mod http_handlers;
 mod model;
 
-use crate::model::stub_response::{Method, Response as StubResponse};
+use crate::http_handlers::{build_response, method_not_allowed};
 use anyhow::Result;
+use axum::http::Method;
 use axum::response::Redirect;
-use axum::routing::{delete, patch, post, put};
-use axum::{
-    Json, Router, body::Body, extract::Path, http::StatusCode, response::Response, routing::get,
-};
+use axum::routing::{any, delete, patch, post, put};
+use axum::{Json, Router, extract::Path, routing::get};
 use log::info;
 
 const DEFAULT_STUB_CONFIG_PATH: &str = "./config/default";
@@ -45,6 +45,7 @@ async fn main() -> Result<()> {
             Method::PUT => app = app.route(&req.url, put(handler)),
             Method::DELETE => app = app.route(&req.url, delete(handler)),
             Method::PATCH => app = app.route(&req.url, patch(handler)),
+            _ => app = app.route(&req.url, any(method_not_allowed)),
         }
     }
 
@@ -53,19 +54,4 @@ async fn main() -> Result<()> {
     info!("Running on: http://{}", host);
     axum::serve(listener, app).await?;
     Ok(())
-}
-
-async fn build_response(res: StubResponse) -> Response {
-    let mut builder = Response::builder().status(StatusCode::from_u16(res.status).unwrap());
-
-    if let Some(headers) = res.headers {
-        for (key, value) in headers {
-            builder = builder.header(key, value);
-        }
-    }
-
-    match res.body {
-        Some(payload) => builder.body(Body::from(payload.to_string())).unwrap(),
-        None => builder.body(Body::empty()).unwrap(),
-    }
 }

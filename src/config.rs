@@ -60,3 +60,23 @@ pub(crate) fn setup_logger() {
         LevelFilter::Info
     });
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn read_stubs_config_reads_and_parses_stubs() {
+        let stubs = read_stubs_config("config/default").expect("read stubs");
+        assert_eq!(stubs.len(), 2);
+    }
+
+    #[test]
+    fn read_server_config_parses_server_yaml() {
+        let cfg = read_server_config("config/default/server.yaml").expect("read server config");
+        assert_eq!(cfg.address, "127.0.0.1");
+        assert_eq!(cfg.port, 8080);
+    }
+
+}
+

@@ -1,13 +1,16 @@
 use crate::model::stub_response::Response as StubResponse;
 use axum::http::StatusCode;
-use axum::{body::Body, extract::Path, response::Response};
+use axum::{
+    body::Body,
+    extract::{Path, Query},
+    response::Response,
+};
 use std::collections::HashMap;
 
-pub async fn build_response(
-    res: StubResponse,
-    _path: Option<Path<HashMap<String, String>>>,
-    _query: Option<HashMap<String, String>>,
-) -> Response {
+pub type PathParams = Option<Path<HashMap<String, String>>>;
+pub type QueryParams = Query<HashMap<String, String>>;
+
+pub async fn build_response(res: StubResponse, _path: PathParams, _query: QueryParams) -> Response {
     let mut builder = Response::builder().status(StatusCode::from_u16(res.status).unwrap());
 
     if let Some(headers) = res.headers {
@@ -55,7 +58,7 @@ mod tests {
             headers: Some(headers),
         };
 
-        let resp = build_response(res, None, None).await;
+        let resp = build_response(res, None, Query(HashMap::new())).await;
         assert_eq!(resp.status(), StatusCode::OK);
         let ct = resp
             .headers()
@@ -88,7 +91,7 @@ mod tests {
             headers: Some(headers),
         };
 
-        let resp = build_response(res, None, None).await;
+        let resp = build_response(res, None, Query(HashMap::new())).await;
         assert_eq!(resp.status(), StatusCode::CREATED);
         let ct = resp
             .headers()
@@ -111,7 +114,7 @@ mod tests {
             headers: None,
         };
 
-        let resp = build_response(res, None, None).await;
+        let resp = build_response(res, None, Query(HashMap::new())).await;
         assert_eq!(resp.status(), StatusCode::NO_CONTENT);
         let expected: Vec<u8> = Vec::new();
         assert!(expected.is_empty());

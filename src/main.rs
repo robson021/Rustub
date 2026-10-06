@@ -4,15 +4,14 @@ mod file_utils;
 mod http_handlers;
 mod model;
 
-use crate::http_handlers::{build_response, method_not_allowed};
+use crate::http_handlers::{PathParams, QueryParams, build_response, method_not_allowed};
 use crate::model::stub_response::StubResponse;
 use anyhow::Result;
 use axum::http::Method;
 use axum::response::Redirect;
 use axum::routing::{any, delete, patch, post, put};
-use axum::{Json, Router, body::Body, extract::Path, http::Request, routing::get};
+use axum::{Json, Router, routing::get};
 use log::{debug, info};
-use std::collections::HashMap;
 
 const DEFAULT_STUB_CONFIG_PATH: &str = "./config/default";
 const DEFAULT_SERVER_CONFIG_PATH: &str = "./config/default/server.yaml";
@@ -46,12 +45,7 @@ fn build_routes_for_stubs(stubs_config: Vec<StubResponse>) -> Router {
         let res = stub.response;
         let url = req.url.clone();
 
-        let handler = move |path_params: Option<Path<HashMap<String, String>>>,
-                            request: Request<Body>| {
-            let query_map = request
-                .uri()
-                .query()
-                .and_then(|q| serde_urlencoded::from_str::<HashMap<String, String>>(q).ok());
+        let handler = move |path_params: PathParams, query_map: QueryParams| {
             debug!(
                 "Url: {} | path params: {:?} | query: {:?}",
                 url, path_params, query_map

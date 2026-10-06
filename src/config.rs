@@ -68,7 +68,7 @@ mod tests {
     #[test]
     fn read_stubs_config_reads_and_parses_stubs() {
         let stubs = read_stubs_config("config/default").expect("read stubs");
-        assert_eq!(stubs.len(), 2);
+        assert_eq!(stubs.len(), 3);
     }
 
     #[test]

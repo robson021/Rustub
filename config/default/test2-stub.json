@@ -1,0 +1,16 @@
+[
+  {
+    "request": {
+      "method": "POST",
+      "url": "/api/user/{id}"
+    },
+    "response": {
+      "status": 201,
+      "body": {
+        "id": 21,
+        "username": "user_21",
+        "role": "user"
+      }
+    }
+  }
+]

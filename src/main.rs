@@ -52,7 +52,7 @@ fn build_routes_for_stubs(stubs_config: Vec<StubResponse>) -> Router {
                 .query()
                 .and_then(|q| serde_urlencoded::from_str::<HashMap<String, String>>(q).ok());
             debug!(
-                "Path params for {}: {:?}; query: {:?}",
+                "Url: {} | params {:?} | query: {:?}",
                 url, path_params, query_map
             );
             let res = res.clone();

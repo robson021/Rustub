@@ -94,8 +94,6 @@ This stub makes the server return a `200 OK` response when a `GET /test` request
 ]
 ```
 
-Rustub supports URL patterns with path parameters such as `{id}` and will build the response accordingly.
-
 ## Notes
 
 Rustub is intentionally simple: it acts as a local HTTP stub server for development and testing. It does not aim to replace a full production API server or service framework.

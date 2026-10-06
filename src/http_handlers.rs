@@ -5,7 +5,7 @@ use std::collections::HashMap;
 
 pub async fn build_response(
     res: StubResponse,
-    _path: Option<Path<String>>,
+    _path: Option<Path<HashMap<String, String>>>,
     _query: Option<HashMap<String, String>>,
 ) -> Response {
     let mut builder = Response::builder().status(StatusCode::from_u16(res.status).unwrap());

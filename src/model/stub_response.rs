@@ -14,21 +14,21 @@ where
 }
 
 #[derive(Deserialize, Debug, Clone)]
-pub struct Response {
-    pub status: u16,
-    pub body: Option<Value>,
-    pub headers: Option<HashMap<String, String>>,
+pub(crate) struct Response {
+    pub(crate) status: u16,
+    pub(crate) body: Option<Value>,
+    pub(crate) headers: Option<HashMap<String, String>>,
 }
 
 #[derive(Deserialize, Clone, Debug)]
-pub struct Request {
-    pub url: String,
+pub(crate) struct Request {
+    pub(crate) url: String,
     #[serde(deserialize_with = "method_from_str")]
-    pub method: Method,
+    pub(crate) method: Method,
 }
 
 #[derive(Deserialize, Clone, Debug)]
-pub struct StubResponse {
-    pub request: Request,
-    pub response: Response,
+pub(crate) struct StubResponse {
+    pub(crate) request: Request,
+    pub(crate) response: Response,
 }

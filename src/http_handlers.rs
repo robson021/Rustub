@@ -1,6 +1,6 @@
 use crate::error::ResponseError;
-use crate::model::stub_response::Response as StubResponse;
 use crate::model;
+use crate::model::stub_response::Response as StubResponse;
 use axum::http::StatusCode;
 use axum::response::IntoResponse;
 use axum::{
@@ -12,10 +12,10 @@ use log::debug;
 use std::collections::HashMap;
 use std::pin::Pin;
 
-pub type PathParams = Option<Path<HashMap<String, String>>>;
-pub type QueryParams = Query<HashMap<String, String>>;
+pub(crate) type PathParams = Option<Path<HashMap<String, String>>>;
+pub(crate) type QueryParams = Query<HashMap<String, String>>;
 
-pub fn create_handler(
+pub(crate) fn create_handler(
     url: String,
     res: model::stub_response::Response,
 ) -> impl Fn(PathParams, QueryParams) -> Pin<Box<dyn Future<Output = axum::response::Response> + Send>>
@@ -90,7 +90,7 @@ fn substitute_params(
     }
 }
 
-pub async fn method_not_allowed(_path: Option<Path<String>>) -> Response {
+pub(crate) async fn method_not_allowed(_path: Option<Path<String>>) -> Response {
     Response::builder()
         .status(StatusCode::METHOD_NOT_ALLOWED)
         .body(Body::empty())

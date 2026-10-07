@@ -5,13 +5,13 @@ use axum::{
 use thiserror::Error;
 
 #[derive(Error, Debug)]
-pub enum FileError {
+pub(crate) enum FileError {
     #[error("File does not exist: {0}")]
     FileDoesNotExist(String),
 }
 
 #[derive(Error, Debug)]
-pub enum ResponseError {
+pub(crate) enum ResponseError {
     #[error("Missing payload placeholder: {0}")]
     MissingPlaceholder(String),
     #[error("Invalid payload template: {0}")]

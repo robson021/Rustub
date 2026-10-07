@@ -2,9 +2,9 @@ use crate::error::ResponseError::InvalidParameters;
 use serde::Deserialize;
 
 #[derive(Debug, Deserialize)]
-pub struct ServerConfig {
-    pub address: String,
-    pub port: u16,
+pub(crate) struct ServerConfig {
+    pub(crate) address: String,
+    pub(crate) port: u16,
 }
 
 pub(crate) fn resolve_config_path(args: &[String]) -> anyhow::Result<String> {

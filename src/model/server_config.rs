@@ -1,7 +1,49 @@
+use crate::error::ResponseError::InvalidParameters;
 use serde::Deserialize;
 
 #[derive(Debug, Deserialize)]
 pub struct ServerConfig {
     pub address: String,
     pub port: u16,
+}
+
+pub(crate) fn resolve_config_path(args: &[String]) -> anyhow::Result<String> {
+    if args.len() != 2 {
+        return Ok("./config/default".to_string());
+    }
+
+    match args {
+        [flag, profile] if matches!(flag.as_str(), "-p" | "--profile") => {
+            Ok(format!("./config/{profile}"))
+        }
+        _ => Err(InvalidParameters.into()),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::resolve_config_path;
+
+    #[test]
+    fn resolves_profile_for_supported_flags() {
+        for flag in ["-p", "--profile"] {
+            let args = [flag.to_string(), "test".to_string()];
+            assert_eq!(resolve_config_path(&args).unwrap(), "./config/test");
+        }
+    }
+
+    #[test]
+    fn resolves_default_profile_for_empty_arguments() {
+        assert_eq!(resolve_config_path(&[]).unwrap(), "./config/default");
+    }
+
+    #[test]
+    fn resolves_default_profile_for_invalid_flag() {
+        let args = ["--invalid".to_string(), "test".to_string()];
+        let result = resolve_config_path(&args);
+        assert_eq!(
+            result.unwrap_err().to_string(),
+            "Invalid parameters. Use -p or --profile to specify a profile."
+        );
+    }
 }

@@ -5,6 +5,7 @@ mod http_handlers;
 mod model;
 
 use crate::http_handlers::{PathParams, QueryParams, build_response, method_not_allowed};
+use crate::model::server_config::resolve_config_path;
 use crate::model::stub_response::StubResponse;
 use anyhow::Result;
 use axum::http::Method;
@@ -12,17 +13,20 @@ use axum::response::{IntoResponse, Redirect};
 use axum::routing::{any, delete, patch, post, put};
 use axum::{Json, Router, routing::get};
 use log::{debug, info};
-use std::{future::Future, pin::Pin};
-
-const DEFAULT_STUB_CONFIG_PATH: &str = "./config/default";
-const DEFAULT_SERVER_CONFIG_PATH: &str = "./config/default/server.yaml";
+use std::{env, future::Future, pin::Pin};
 
 #[tokio::main]
 async fn main() -> Result<()> {
     config::setup_logger();
 
-    let server_config = config::read_server_config(DEFAULT_SERVER_CONFIG_PATH)?;
-    let stubs_config = config::read_stubs_config(DEFAULT_STUB_CONFIG_PATH)?;
+    let args: Vec<String> = env::args().skip(1).collect();
+    debug!("Cmd args: {:?}", args);
+
+    let cfg_path = resolve_config_path(&args)?;
+    let server_cfg_path = format!("{cfg_path}/server.yaml");
+
+    let server_config = config::read_server_config(&server_cfg_path)?;
+    let stubs_config = config::read_stubs_config(&cfg_path)?;
 
     info!("Server config: {:?}", server_config);
     info!("Stubs config: {:?}", stubs_config);

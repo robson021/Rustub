@@ -16,6 +16,9 @@ pub enum ResponseError {
     MissingPlaceholder(String),
     #[error("Invalid payload template: {0}")]
     InvalidTemplate(String),
+
+    #[error("Invalid parameters. Use -p or --profile to specify a profile.")]
+    InvalidParameters,
 }
 
 impl From<strfmt::FmtError> for ResponseError {

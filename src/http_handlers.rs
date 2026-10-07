@@ -10,7 +10,7 @@ use std::collections::HashMap;
 pub type PathParams = Option<Path<HashMap<String, String>>>;
 pub type QueryParams = Query<HashMap<String, String>>;
 
-pub async fn build_response(res: StubResponse, _path: PathParams, _query: QueryParams) -> Response {
+pub async fn build_response(res: StubResponse, path: PathParams, query: QueryParams) -> Response {
     let mut builder = Response::builder().status(StatusCode::from_u16(res.status).unwrap());
 
     if let Some(headers) = res.headers {
@@ -20,9 +20,66 @@ pub async fn build_response(res: StubResponse, _path: PathParams, _query: QueryP
     }
 
     match res.body {
-        Some(payload) => builder.body(Body::from(payload.to_string())).unwrap(),
+        Some(payload) => {
+            let mut params = HashMap::new();
+            if let Some(Path(path_params)) = path {
+                params.extend(path_params);
+            }
+            params.extend(query.0);
+
+            let payload = substitute_params(payload, &params);
+            builder.body(Body::from(payload.to_string())).unwrap()
+        }
         None => builder.body(Body::empty()).unwrap(),
     }
+}
+
+fn substitute_params(
+    mut value: serde_json::Value,
+    params: &HashMap<String, String>,
+) -> serde_json::Value {
+    match &mut value {
+        serde_json::Value::String(text) => {
+            let mut substituted = String::with_capacity(text.len());
+            let mut remaining = text.as_str();
+
+            while let Some(open) = remaining.find('{') {
+                let (before, from_open) = remaining.split_at(open);
+                substituted.push_str(before);
+
+                let Some(close) = from_open.find('}') else {
+                    substituted.push_str(from_open);
+                    remaining = "";
+                    break;
+                };
+
+                let (placeholder, after_placeholder) = from_open[1..].split_at(close - 1);
+                if let Some(param) = params.get(placeholder) {
+                    substituted.push_str(param);
+                } else {
+                    substituted.push('{');
+                    substituted.push_str(placeholder);
+                    substituted.push('}');
+                }
+                remaining = &after_placeholder[1..];
+            }
+
+            substituted.push_str(remaining);
+            *text = substituted;
+        }
+        serde_json::Value::Array(items) => {
+            for item in items {
+                *item = substitute_params(std::mem::take(item), params);
+            }
+        }
+        serde_json::Value::Object(object) => {
+            for item in object.values_mut() {
+                *item = substitute_params(std::mem::take(item), params);
+            }
+        }
+        _ => {}
+    }
+    value
 }
 
 pub async fn method_not_allowed(_path: Option<Path<String>>) -> Response {
@@ -118,5 +175,54 @@ mod tests {
         assert_eq!(resp.status(), StatusCode::NO_CONTENT);
         let expected: Vec<u8> = Vec::new();
         assert!(expected.is_empty());
+    }
+
+    #[tokio::test]
+    async fn substitutes_multiple_path_and_query_params_in_nested_payload() {
+        let res = StubResponse {
+            status: 201,
+            body: Some(json!({
+                "id": "{id}",
+                "username": "user_{id}",
+                "profile": {
+                    "role": "{role}",
+                    "isActive": "{active}",
+                    "tenant": "{tenant}",
+                    "region": "{region}"
+                },
+                "unmatched": "{missing}"
+            })),
+            headers: None,
+        };
+        let path = Some(Path(HashMap::from([
+            ("id".to_string(), "42".to_string()),
+            ("tenant".to_string(), "acme".to_string()),
+        ])));
+        let query = Query(HashMap::from([
+            ("role".to_string(), "admin".to_string()),
+            ("active".to_string(), "true".to_string()),
+            ("region".to_string(), "west".to_string()),
+        ]));
+
+        let response = build_response(res, path, query).await;
+        let body = axum::body::to_bytes(response.into_body(), usize::MAX)
+            .await
+            .unwrap();
+        let body: serde_json::Value = serde_json::from_slice(&body).unwrap();
+
+        assert_eq!(
+            body,
+            json!({
+                "id": "42",
+                "username": "user_42",
+                "profile": {
+                    "role": "admin",
+                    "isActive": "true",
+                    "tenant": "acme",
+                    "region": "west"
+                },
+                "unmatched": "{missing}"
+            })
+        );
     }
 }

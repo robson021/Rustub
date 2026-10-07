@@ -45,16 +45,17 @@ fn build_routes_for_stubs(stubs_config: Vec<StubResponse>) -> Router {
         let req = stub.request;
         let res = stub.response;
         let url = req.url.clone();
+        let route_path = req.url.split('?').next().unwrap_or(&req.url);
 
         let handler = create_handler(url, res);
 
         match req.method {
-            Method::GET => app = app.route(&req.url, get(handler)),
-            Method::POST => app = app.route(&req.url, post(handler)),
-            Method::PUT => app = app.route(&req.url, put(handler)),
-            Method::DELETE => app = app.route(&req.url, delete(handler)),
-            Method::PATCH => app = app.route(&req.url, patch(handler)),
-            _ => app = app.route(&req.url, any(method_not_allowed)),
+            Method::GET => app = app.route(route_path, get(handler)),
+            Method::POST => app = app.route(route_path, post(handler)),
+            Method::PUT => app = app.route(route_path, put(handler)),
+            Method::DELETE => app = app.route(route_path, delete(handler)),
+            Method::PATCH => app = app.route(route_path, patch(handler)),
+            _ => app = app.route(route_path, any(method_not_allowed)),
         }
     }
     app

@@ -1,15 +1,17 @@
 [
   {
     "request": {
-      "method": "POST",
-      "url": "/api/user/{id}"
+      "method": "GET",
+      "url": "/api/v2/user/{id}/{region}?role={role}&active={active}"
     },
     "response": {
-      "status": 201,
+      "status": 200,
       "body": {
-        "id": 21,
-        "username": "user_21",
-        "role": "user"
+        "id": "{id}",
+        "region": "{region}",
+        "username": "user_{id}",
+        "role": "{role}",
+        "isActive": "{active}"
       }
     }
   }

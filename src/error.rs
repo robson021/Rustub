@@ -17,8 +17,8 @@ pub(crate) enum ResponseError {
     #[error("Invalid payload template: {0}")]
     InvalidTemplate(String),
 
-    #[error("Invalid parameters. Use -p or --profile to specify a profile.")]
-    InvalidParameters,
+    #[error("Invalid parameters. Use {0} or {1} to specify a profile.")]
+    InvalidProfileParameters(&'static str, &'static str),
 }
 
 impl From<strfmt::FmtError> for ResponseError {

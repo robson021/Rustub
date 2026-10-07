@@ -1,4 +1,4 @@
-use crate::error::ResponseError::InvalidParameters;
+use crate::error::ResponseError::InvalidProfileParameters;
 use serde::Deserialize;
 
 #[derive(Debug, Deserialize)]
@@ -12,11 +12,14 @@ pub(crate) fn resolve_config_path(args: &[String]) -> anyhow::Result<String> {
         return Ok("./config/default".to_string());
     }
 
+    const P: &str = "-p";
+    const PROFILE: &str = "--profile";
+
     match args {
-        [flag, profile] if matches!(flag.as_str(), "-p" | "--profile") => {
+        [flag, profile] if matches!(flag.as_str(), P | PROFILE) => {
             Ok(format!("./config/{profile}"))
         }
-        _ => Err(InvalidParameters.into()),
+        _ => Err(InvalidProfileParameters(P, PROFILE).into()),
     }
 }
 

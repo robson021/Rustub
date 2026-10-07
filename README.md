@@ -46,6 +46,44 @@ server:
   port: 8080
 ```
 
+### Using a custom profile
+
+Rustub supports selecting a config profile by directory name under `config/`.
+
+- Default profile: `config/default`
+- Custom profile: `config/<profile>`
+
+You can run the app with a custom profile like this:
+
+```bash
+cargo run -- -p dev
+```
+
+or:
+
+```bash
+cargo run -- --profile staging
+```
+
+This loads:
+
+- `config/dev/server.yaml`
+- `config/dev/*-stub.json`
+
+Example custom profile structure:
+
+```text
+config/
+  default/
+    server.yaml
+    test-stub.json
+  dev/
+    server.yaml
+    api-stub.json
+```
+
+`server.yaml` still follows the same format as the default profile, and the stub files can be any JSON list of stub definitions.
+
 ## Example stub
 
 ```json

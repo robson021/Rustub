@@ -4,16 +4,16 @@ mod file_utils;
 mod http_handlers;
 mod model;
 
-use crate::http_handlers::{PathParams, QueryParams, build_response, method_not_allowed};
+use crate::http_handlers::{create_handler, method_not_allowed};
 use crate::model::server_config::resolve_config_path;
 use crate::model::stub_response::StubResponse;
 use anyhow::Result;
 use axum::http::Method;
-use axum::response::{IntoResponse, Redirect};
+use axum::response::Redirect;
 use axum::routing::{any, delete, patch, post, put};
 use axum::{Json, Router, routing::get};
 use log::{debug, info};
-use std::{env, future::Future, pin::Pin};
+use std::env;
 
 #[tokio::main]
 async fn main() -> Result<()> {
@@ -63,29 +63,4 @@ fn build_routes_for_stubs(stubs_config: Vec<StubResponse>) -> Router {
         }
     }
     app
-}
-
-fn create_handler(
-    url: String,
-    res: model::stub_response::Response,
-) -> impl Fn(PathParams, QueryParams) -> Pin<Box<dyn Future<Output = axum::response::Response> + Send>>
-+ Clone {
-    move |path_params, query_map| {
-        debug!(
-            "Url: {} | path params: {:?} | query: {:?}",
-            url, path_params, query_map
-        );
-        let res = res.clone();
-        Box::pin(async move {
-            build_response(res, path_params, query_map)
-                .await
-                .unwrap_or_else(|error| match error.downcast::<error::ResponseError>() {
-                    Ok(response_error) => response_error.into_response(),
-                    Err(error) => {
-                        log::error!("Failed to build stub response: {error:#}");
-                        axum::http::StatusCode::INTERNAL_SERVER_ERROR.into_response()
-                    }
-                })
-        })
-    }
 }

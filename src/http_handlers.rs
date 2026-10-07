@@ -1,17 +1,46 @@
 use crate::error::ResponseError;
 use crate::model::stub_response::Response as StubResponse;
+use crate::model;
 use axum::http::StatusCode;
+use axum::response::IntoResponse;
 use axum::{
     body::Body,
     extract::{Path, Query},
     response::Response,
 };
+use log::debug;
 use std::collections::HashMap;
+use std::pin::Pin;
 
 pub type PathParams = Option<Path<HashMap<String, String>>>;
 pub type QueryParams = Query<HashMap<String, String>>;
 
-pub async fn build_response(
+pub fn create_handler(
+    url: String,
+    res: model::stub_response::Response,
+) -> impl Fn(PathParams, QueryParams) -> Pin<Box<dyn Future<Output = axum::response::Response> + Send>>
++ Clone {
+    move |path_params, query_map| {
+        debug!(
+            "Url: {} | path params: {:?} | query: {:?}",
+            url, path_params, query_map
+        );
+        let res = res.clone();
+        Box::pin(async move {
+            build_response(res, path_params, query_map)
+                .await
+                .unwrap_or_else(|error| match error.downcast::<ResponseError>() {
+                    Ok(response_error) => response_error.into_response(),
+                    Err(error) => {
+                        log::error!("Failed to build stub response: {error:#}");
+                        StatusCode::INTERNAL_SERVER_ERROR.into_response()
+                    }
+                })
+        })
+    }
+}
+
+async fn build_response(
     res: StubResponse,
     path: PathParams,
     query: QueryParams,

@@ -23,12 +23,20 @@ pub(crate) fn resolve_config_path(args: &[String]) -> anyhow::Result<String> {
 #[cfg(test)]
 mod tests {
     use super::resolve_config_path;
+    use quickcheck::quickcheck;
 
-    #[test]
-    fn resolves_profile_for_supported_flags() {
-        for flag in ["-p", "--profile"] {
-            let args = [flag.to_string(), "test".to_string()];
-            assert_eq!(resolve_config_path(&args).unwrap(), "./config/test");
+    quickcheck! {
+        #[test]
+        fn resolves_arbitrary_profile_for_supported_flags(
+            profile: String,
+            use_long_flag: bool
+        ) -> bool {
+            let flag = if use_long_flag { "--profile" } else { "-p" };
+            let args = [flag.to_string(), profile.clone()];
+            matches!(
+                resolve_config_path(&args),
+                Ok(path) if path == format!("./config/{profile}")
+            )
         }
     }
 

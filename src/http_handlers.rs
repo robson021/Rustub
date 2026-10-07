@@ -101,8 +101,28 @@ pub(crate) async fn method_not_allowed(_path: Option<Path<String>>) -> Response 
 mod tests {
     use super::*;
     use axum::response::IntoResponse;
+    use quickcheck::quickcheck;
     use serde_json::json;
     use std::collections::HashMap;
+
+    quickcheck! {
+        #[test]
+        fn substitutes_arbitrary_values_recursively(value: String, count: u8) -> bool {
+            let params = HashMap::from([("value".to_string(), value.clone())]);
+            let payload = serde_json::Value::Array(
+                (0..count)
+                    .map(|_| json!({"nested": ["prefix-{value}", {"value": "{value}"}]}))
+                    .collect(),
+            );
+            let expected = serde_json::Value::Array(
+                (0..count)
+                    .map(|_| json!({"nested": [format!("prefix-{value}"), {"value": value}]}))
+                    .collect(),
+            );
+
+            substitute_params(payload, &params).is_ok_and(|result| result == expected)
+        }
+    }
 
     #[test]
     fn substitutes_params_in_nested_objects_and_arrays() {

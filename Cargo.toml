@@ -16,3 +16,6 @@ log = "0.4.34"
 log4rs = "1"
 walkdir = "2.5.0"
 strfmt = { version = "0.2.6", default-features = false }
+
+[dev-dependencies]
+quickcheck = "1.0"

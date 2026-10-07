@@ -27,11 +27,6 @@ Each stub defines:
 
 ## Getting started
 
-### Prerequisites
-
-- Rust toolchain
-- Cargo
-
 ### Run the app
 
 ```bash

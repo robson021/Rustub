@@ -12,6 +12,7 @@ use axum::response::Redirect;
 use axum::routing::{any, delete, patch, post, put};
 use axum::{Json, Router, routing::get};
 use log::{debug, info};
+use std::{future::Future, pin::Pin};
 
 const DEFAULT_STUB_CONFIG_PATH: &str = "./config/default";
 const DEFAULT_SERVER_CONFIG_PATH: &str = "./config/default/server.yaml";
@@ -45,14 +46,7 @@ fn build_routes_for_stubs(stubs_config: Vec<StubResponse>) -> Router {
         let res = stub.response;
         let url = req.url.clone();
 
-        let handler = move |path_params: PathParams, query_map: QueryParams| {
-            debug!(
-                "Url: {} | path params: {:?} | query: {:?}",
-                url, path_params, query_map
-            );
-            let res = res.clone();
-            async move { build_response(res, path_params, query_map).await }
-        };
+        let handler = create_handler(url, res);
 
         match req.method {
             Method::GET => app = app.route(&req.url, get(handler)),
@@ -64,4 +58,19 @@ fn build_routes_for_stubs(stubs_config: Vec<StubResponse>) -> Router {
         }
     }
     app
+}
+
+fn create_handler(
+    url: String,
+    res: model::stub_response::Response,
+) -> impl Fn(PathParams, QueryParams) -> Pin<Box<dyn Future<Output = axum::response::Response> + Send>>
++ Clone {
+    move |path_params, query_map| {
+        debug!(
+            "Url: {} | path params: {:?} | query: {:?}",
+            url, path_params, query_map
+        );
+        let res = res.clone();
+        Box::pin(async move { build_response(res, path_params, query_map).await })
+    }
 }

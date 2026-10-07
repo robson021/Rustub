@@ -8,7 +8,7 @@ use crate::http_handlers::{PathParams, QueryParams, build_response, method_not_a
 use crate::model::stub_response::StubResponse;
 use anyhow::Result;
 use axum::http::Method;
-use axum::response::Redirect;
+use axum::response::{IntoResponse, Redirect};
 use axum::routing::{any, delete, patch, post, put};
 use axum::{Json, Router, routing::get};
 use log::{debug, info};
@@ -72,6 +72,16 @@ fn create_handler(
             url, path_params, query_map
         );
         let res = res.clone();
-        Box::pin(async move { build_response(res, path_params, query_map).await })
+        Box::pin(async move {
+            build_response(res, path_params, query_map)
+                .await
+                .unwrap_or_else(|error| match error.downcast::<error::ResponseError>() {
+                    Ok(response_error) => response_error.into_response(),
+                    Err(error) => {
+                        log::error!("Failed to build stub response: {error:#}");
+                        axum::http::StatusCode::INTERNAL_SERVER_ERROR.into_response()
+                    }
+                })
+        })
     }
 }

@@ -1,3 +1,4 @@
+use crate::error::ResponseError;
 use crate::model::stub_response::Response as StubResponse;
 use axum::http::StatusCode;
 use axum::{
@@ -10,8 +11,12 @@ use std::collections::HashMap;
 pub type PathParams = Option<Path<HashMap<String, String>>>;
 pub type QueryParams = Query<HashMap<String, String>>;
 
-pub async fn build_response(res: StubResponse, path: PathParams, query: QueryParams) -> Response {
-    let mut builder = Response::builder().status(StatusCode::from_u16(res.status).unwrap());
+pub async fn build_response(
+    res: StubResponse,
+    path: PathParams,
+    query: QueryParams,
+) -> anyhow::Result<Response> {
+    let mut builder = Response::builder().status(StatusCode::from_u16(res.status)?);
 
     if let Some(headers) = res.headers {
         for (key, value) in headers {
@@ -27,59 +32,33 @@ pub async fn build_response(res: StubResponse, path: PathParams, query: QueryPar
             }
             params.extend(query.0);
 
-            let payload = substitute_params(payload, &params);
-            builder.body(Body::from(payload.to_string())).unwrap()
+            let payload = substitute_params(payload, &params)?;
+            Ok(builder.body(Body::from(payload.to_string()))?)
         }
-        None => builder.body(Body::empty()).unwrap(),
+        None => Ok(builder.body(Body::empty())?),
     }
 }
 
 fn substitute_params(
-    mut value: serde_json::Value,
+    value: serde_json::Value,
     params: &HashMap<String, String>,
-) -> serde_json::Value {
-    match &mut value {
-        serde_json::Value::String(text) => {
-            let mut substituted = String::with_capacity(text.len());
-            let mut remaining = text.as_str();
-
-            while let Some(open) = remaining.find('{') {
-                let (before, from_open) = remaining.split_at(open);
-                substituted.push_str(before);
-
-                let Some(close) = from_open.find('}') else {
-                    substituted.push_str(from_open);
-                    remaining = "";
-                    break;
-                };
-
-                let (placeholder, after_placeholder) = from_open[1..].split_at(close - 1);
-                if let Some(param) = params.get(placeholder) {
-                    substituted.push_str(param);
-                } else {
-                    substituted.push('{');
-                    substituted.push_str(placeholder);
-                    substituted.push('}');
-                }
-                remaining = &after_placeholder[1..];
-            }
-
-            substituted.push_str(remaining);
-            *text = substituted;
-        }
-        serde_json::Value::Array(items) => {
-            for item in items {
-                *item = substitute_params(std::mem::take(item), params);
-            }
-        }
-        serde_json::Value::Object(object) => {
-            for item in object.values_mut() {
-                *item = substitute_params(std::mem::take(item), params);
-            }
-        }
-        _ => {}
+) -> anyhow::Result<serde_json::Value> {
+    match value {
+        serde_json::Value::String(text) => Ok(serde_json::Value::String(
+            strfmt::strfmt(&text, params).map_err(ResponseError::from)?,
+        )),
+        serde_json::Value::Array(items) => items
+            .into_iter()
+            .map(|item| substitute_params(item, params))
+            .collect::<anyhow::Result<Vec<_>>>()
+            .map(serde_json::Value::Array),
+        serde_json::Value::Object(object) => object
+            .into_iter()
+            .map(|(key, value)| Ok((key, substitute_params(value, params)?)))
+            .collect::<anyhow::Result<_>>()
+            .map(serde_json::Value::Object),
+        value => Ok(value),
     }
-    value
 }
 
 pub async fn method_not_allowed(_path: Option<Path<String>>) -> Response {
@@ -92,8 +71,67 @@ pub async fn method_not_allowed(_path: Option<Path<String>>) -> Response {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use axum::response::IntoResponse;
     use serde_json::json;
     use std::collections::HashMap;
+
+    #[test]
+    fn substitutes_params_in_nested_objects_and_arrays() {
+        let params = HashMap::from([
+            ("id".to_string(), "42".to_string()),
+            ("tenant".to_string(), "acme".to_string()),
+            ("role".to_string(), "admin".to_string()),
+            ("active".to_string(), "true".to_string()),
+        ]);
+        let payload = json!({
+            "user": {
+                "id": "{id}",
+                "username": "user_{id}",
+                "tenant": "{tenant}",
+                "roles": ["{role}", "auditor"],
+                "metadata": [
+                    {"active": "{active}"},
+                    {"description": "account for {tenant}/{id}"}
+                ]
+            },
+            "count": 2,
+            "enabled": true,
+            "nothing": null
+        });
+
+        let result = substitute_params(payload, &params).unwrap();
+
+        assert_eq!(
+            result,
+            json!({
+                "user": {
+                    "id": "42",
+                    "username": "user_42",
+                    "tenant": "acme",
+                    "roles": ["admin", "auditor"],
+                    "metadata": [
+                        {"active": "true"},
+                        {"description": "account for acme/42"}
+                    ]
+                },
+                "count": 2,
+                "enabled": true,
+                "nothing": null
+            })
+        );
+    }
+
+    #[test]
+    fn reports_missing_placeholder_inside_nested_array() {
+        let payload = json!({"items": [{"id": "{missing}"}]});
+
+        let error = substitute_params(payload, &HashMap::new()).unwrap_err();
+
+        assert!(matches!(
+            error.downcast_ref::<ResponseError>(),
+            Some(ResponseError::MissingPlaceholder(placeholder)) if placeholder == "missing"
+        ));
+    }
 
     #[tokio::test]
     async fn plain_text_body_and_headers_applied() {
@@ -115,7 +153,9 @@ mod tests {
             headers: Some(headers),
         };
 
-        let resp = build_response(res, None, Query(HashMap::new())).await;
+        let resp = build_response(res, None, Query(HashMap::new()))
+            .await
+            .unwrap();
         assert_eq!(resp.status(), StatusCode::OK);
         let ct = resp
             .headers()
@@ -133,7 +173,7 @@ mod tests {
     #[tokio::test]
     async fn complex_json_body_is_serialized_and_headers_set() {
         let payload = json!({
-            "user": {"id": 1, "name": "alice"},
+            "user": {"id": 1, "name": "Alice"},
             "roles": ["admin", "user"]
         });
 
@@ -148,7 +188,9 @@ mod tests {
             headers: Some(headers),
         };
 
-        let resp = build_response(res, None, Query(HashMap::new())).await;
+        let resp = build_response(res, None, Query(HashMap::new()))
+            .await
+            .unwrap();
         assert_eq!(resp.status(), StatusCode::CREATED);
         let ct = resp
             .headers()
@@ -158,8 +200,7 @@ mod tests {
             .unwrap();
         assert_eq!(ct, ct_val);
         let expected = serde_json::to_string(&payload).unwrap();
-        // the serialized JSON should contain the user name and roles
-        assert!(expected.contains("\"name\":\"alice\""));
+        assert!(expected.contains("\"name\":\"Alice\""));
         assert!(expected.contains("\"roles\""));
     }
 
@@ -171,7 +212,9 @@ mod tests {
             headers: None,
         };
 
-        let resp = build_response(res, None, Query(HashMap::new())).await;
+        let resp = build_response(res, None, Query(HashMap::new()))
+            .await
+            .unwrap();
         assert_eq!(resp.status(), StatusCode::NO_CONTENT);
         let expected: Vec<u8> = Vec::new();
         assert!(expected.is_empty());
@@ -190,7 +233,7 @@ mod tests {
                     "tenant": "{tenant}",
                     "region": "{region}"
                 },
-                "unmatched": "{missing}"
+                "unmatched": "no placeholder here"
             })),
             headers: None,
         };
@@ -204,7 +247,7 @@ mod tests {
             ("region".to_string(), "west".to_string()),
         ]));
 
-        let response = build_response(res, path, query).await;
+        let response = build_response(res, path, query).await.unwrap();
         let body = axum::body::to_bytes(response.into_body(), usize::MAX)
             .await
             .unwrap();
@@ -221,8 +264,28 @@ mod tests {
                     "tenant": "acme",
                     "region": "west"
                 },
-                "unmatched": "{missing}"
+                "unmatched": "no placeholder here"
             })
         );
+    }
+
+    #[tokio::test]
+    async fn missing_placeholder_returns_bad_request() {
+        let res = StubResponse {
+            status: 200,
+            body: Some(json!({"id": "{missing}"})),
+            headers: None,
+        };
+
+        let error = build_response(res, None, Query(HashMap::new()))
+            .await
+            .unwrap_err();
+        assert!(matches!(
+            error.downcast_ref::<ResponseError>(),
+            Some(ResponseError::MissingPlaceholder(placeholder)) if placeholder == "missing"
+        ));
+        let response = error.downcast::<ResponseError>().unwrap().into_response();
+
+        assert_eq!(response.status(), StatusCode::BAD_REQUEST);
     }
 }

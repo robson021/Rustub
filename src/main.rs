@@ -36,7 +36,7 @@ async fn main() -> Result<()> {
     let addr: SocketAddr = format!("{}:{}", server_config.address, server_config.port).parse()?;
     let app = build_routes_for_stubs(stubs_config);
     if server_config.tls_enabled {
-        let config_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("config");
+        let config_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("config/cert");
         let tls_config = RustlsConfig::from_pem_file(
             config_dir.join("server-cert.pem"),
             config_dir.join("server-key.pem"),

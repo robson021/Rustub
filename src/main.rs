@@ -20,15 +20,14 @@ use std::path::PathBuf;
 
 #[tokio::main]
 async fn main() -> Result<()> {
-    config::setup_logger();
-
     let args: Vec<String> = env::args().skip(1).collect();
-    debug!("Cmd args: {:?}", args);
-
     let cfg_path = resolve_config_path(&args)?;
     let server_cfg_path = format!("{cfg_path}/server.yaml");
-
     let server_config = config::read_server_config(&server_cfg_path)?;
+
+    config::setup_logger(server_config.tls_enabled);
+    debug!("Cmd args: {:?}", args);
+
     let stubs_config = config::read_stubs_config(&cfg_path)?;
 
     info!("Server config: {:?}", server_config);

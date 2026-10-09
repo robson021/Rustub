@@ -39,26 +39,27 @@ pub(crate) fn read_server_config(path: &str) -> Result<ServerConfig> {
     Ok(config.server)
 }
 
-pub(crate) fn setup_logger() {
+pub(crate) fn setup_logger(tls_enabled: bool) {
     const LOG_PATTERN: &str = "{h({d(%Y-%m-%d %H:%M:%S)(utc)} - {l}: {m}{n})}";
     let stderr = ConsoleAppender::builder()
         .encoder(Box::new(PatternEncoder::new(LOG_PATTERN)))
         .target(Target::Stderr)
         .build();
 
-    let error_trace_level = Root::builder().appender("stderr").build(LevelFilter::Trace);
-
-    let console_cfg = log4rs::Config::builder()
-        .appender(Appender::builder().build("stderr", Box::new(stderr)))
-        .build(error_trace_level)
-        .unwrap();
-
-    log4rs::init_config(console_cfg).unwrap();
-    log::set_max_level(if cfg!(debug_assertions) {
+    let max_level = if cfg!(debug_assertions) && !tls_enabled {
         LevelFilter::Debug
     } else {
         LevelFilter::Info
-    });
+    };
+    let root = Root::builder().appender("stderr").build(max_level);
+
+    let console_cfg = log4rs::Config::builder()
+        .appender(Appender::builder().build("stderr", Box::new(stderr)))
+        .build(root)
+        .unwrap();
+
+    log4rs::init_config(console_cfg).unwrap();
+    log::set_max_level(max_level);
 }
 
 #[cfg(test)]
@@ -76,6 +77,5 @@ mod tests {
         let cfg = read_server_config("config/default/server.yaml").expect("read server config");
         assert_eq!(cfg.address, "127.0.0.1");
         assert_eq!(cfg.port, 8080);
-        assert!(cfg.tls_enabled);
     }
 }

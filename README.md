@@ -42,6 +42,7 @@ By default, Rustub reads:
 
 ```yaml
 server:
+  tls.enabled: true
   address: "127.0.0.1"
   port: 8080
 ```
@@ -69,6 +70,17 @@ This loads:
 
 - `config/dev/server.yaml`
 - `config/dev/*-stub.json`
+
+### HTTPS
+
+When `tls.enabled` is `true`, Rustub serves HTTPS on the configured `port`,
+using the self-signed certificate in `config/server-cert.pem` and private key
+in `config/server-key.pem`. When it is `false` or omitted, it serves HTTP on
+that port. The development certificate is for `localhost` and `127.0.0.1`;
+clients must explicitly trust it (for example,
+`curl -k https://127.0.0.1:8080/hello`). Replace both files with a certificate
+and key from a trusted certificate authority before using Rustub beyond local
+development.
 
 Example custom profile structure:
 

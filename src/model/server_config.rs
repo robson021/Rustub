@@ -4,7 +4,10 @@ use serde::Deserialize;
 #[derive(Debug, Deserialize)]
 pub(crate) struct ServerConfig {
     pub(crate) address: String,
+    #[serde(alias = "http_port", alias = "https_port")]
     pub(crate) port: u16,
+    #[serde(rename = "tls.enabled", default)]
+    pub(crate) tls_enabled: bool,
 }
 
 pub(crate) fn resolve_config_path(args: &[String]) -> anyhow::Result<String> {
@@ -25,8 +28,17 @@ pub(crate) fn resolve_config_path(args: &[String]) -> anyhow::Result<String> {
 
 #[cfg(test)]
 mod tests {
-    use super::resolve_config_path;
+    use super::{ServerConfig, resolve_config_path};
     use quickcheck::quickcheck;
+
+    #[test]
+    fn parses_tls_enabled_flag() {
+        let config: ServerConfig =
+            serde_yaml::from_str("address: \"127.0.0.1\"\nport: 8080\ntls.enabled: true\n")
+                .unwrap();
+        assert_eq!(config.port, 8080);
+        assert!(config.tls_enabled);
+    }
 
     quickcheck! {
         #[test]

@@ -76,5 +76,6 @@ mod tests {
         let cfg = read_server_config("config/default/server.yaml").expect("read server config");
         assert_eq!(cfg.address, "127.0.0.1");
         assert_eq!(cfg.port, 8080);
+        assert!(cfg.tls_enabled);
     }
 }

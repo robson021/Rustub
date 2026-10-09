@@ -12,8 +12,11 @@ use axum::http::Method;
 use axum::response::Redirect;
 use axum::routing::{any, delete, patch, post, put};
 use axum::{Json, Router, routing::get};
+use axum_server::tls_rustls::RustlsConfig;
 use log::{debug, info};
 use std::env;
+use std::net::SocketAddr;
+use std::path::PathBuf;
 
 #[tokio::main]
 async fn main() -> Result<()> {
@@ -31,12 +34,24 @@ async fn main() -> Result<()> {
     info!("Server config: {:?}", server_config);
     info!("Stubs config: {:?}", stubs_config);
 
-    let host = &format!("{}:{}", server_config.address, server_config.port);
-    let listener = tokio::net::TcpListener::bind(host).await?;
+    let addr: SocketAddr = format!("{}:{}", server_config.address, server_config.port).parse()?;
     let app = build_routes_for_stubs(stubs_config);
-
-    info!("Running on: http://{}", host);
-    axum::serve(listener, app).await?;
+    if server_config.tls_enabled {
+        let config_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("config");
+        let tls_config = RustlsConfig::from_pem_file(
+            config_dir.join("server-cert.pem"),
+            config_dir.join("server-key.pem"),
+        )
+        .await?;
+        info!("Running HTTPS on {}", addr);
+        axum_server::bind_rustls(addr, tls_config)
+            .serve(app.into_make_service())
+            .await?;
+    } else {
+        let listener = tokio::net::TcpListener::bind(addr).await?;
+        info!("Running HTTP on {}", addr);
+        axum::serve(listener, app).await?;
+    }
     Ok(())
 }
 

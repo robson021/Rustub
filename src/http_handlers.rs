@@ -11,6 +11,7 @@ use axum::{
 use log::debug;
 use std::collections::HashMap;
 use std::future::{Ready, ready};
+use std::sync::Arc;
 
 pub(crate) type PathParams = Option<Path<HashMap<String, String>>>;
 pub(crate) type QueryParams = Query<HashMap<String, String>>;
@@ -19,19 +20,20 @@ pub(crate) fn create_handler(
     url: String,
     res: model::stub_response::Response,
 ) -> impl Fn(PathParams, QueryParams) -> Ready<Response> + Clone {
+    let res = Arc::new(res);
     move |path_params, query_map| {
         debug!(
             "Url: {} | path params: {:?} | query: {:?}",
             url, path_params, query_map
         );
         ready(
-            build_response(res.clone(), path_params, query_map).unwrap_or_else(|error| {
-                match error.downcast::<ResponseError>() {
-                    Ok(response_error) => response_error.into_response(),
-                    Err(error) => {
-                        log::error!("Failed to build stub response: {error:#}");
-                        StatusCode::INTERNAL_SERVER_ERROR.into_response()
-                    }
+            build_response(&res, path_params, query_map).unwrap_or_else(|error| match error
+                .downcast::<ResponseError>(
+            ) {
+                Ok(response_error) => response_error.into_response(),
+                Err(error) => {
+                    log::error!("Failed to build stub response: {error:#}");
+                    StatusCode::INTERNAL_SERVER_ERROR.into_response()
                 }
             }),
         )
@@ -39,19 +41,19 @@ pub(crate) fn create_handler(
 }
 
 fn build_response(
-    res: StubResponse,
+    res: &StubResponse,
     path: PathParams,
     query: QueryParams,
 ) -> anyhow::Result<Response> {
     let mut builder = Response::builder().status(StatusCode::from_u16(res.status)?);
 
-    if let Some(headers) = res.headers {
+    if let Some(headers) = &res.headers {
         for (key, value) in headers {
-            builder = builder.header(key, value);
+            builder = builder.header(key.as_str(), value.as_str());
         }
     }
 
-    match res.body {
+    match &res.body {
         Some(payload) => {
             let mut params = HashMap::new();
             if let Some(Path(path_params)) = path {
@@ -67,27 +69,27 @@ fn build_response(
 }
 
 fn substitute_params(
-    value: serde_json::Value,
+    value: &serde_json::Value,
     params: &HashMap<String, String>,
 ) -> anyhow::Result<serde_json::Value> {
     match value {
         serde_json::Value::String(text) if !text.contains('{') => {
-            Ok(serde_json::Value::String(text))
+            Ok(serde_json::Value::String(text.clone()))
         }
         serde_json::Value::String(text) => Ok(serde_json::Value::String(
-            strfmt::strfmt(&text, params).map_err(ResponseError::from)?,
+            strfmt::strfmt(text, params).map_err(ResponseError::from)?,
         )),
         serde_json::Value::Array(items) => items
-            .into_iter()
+            .iter()
             .map(|item| substitute_params(item, params))
             .collect::<anyhow::Result<Vec<_>>>()
             .map(serde_json::Value::Array),
         serde_json::Value::Object(object) => object
             .into_iter()
-            .map(|(key, value)| Ok((key, substitute_params(value, params)?)))
+            .map(|(key, value)| Ok((key.clone(), substitute_params(value, params)?)))
             .collect::<anyhow::Result<_>>()
             .map(serde_json::Value::Object),
-        value => Ok(value),
+        value => Ok(value.clone()),
     }
 }
 
@@ -121,7 +123,7 @@ mod tests {
                     .collect(),
             );
 
-            substitute_params(payload, &params).is_ok_and(|result| result == expected)
+            substitute_params(&payload, &params).is_ok_and(|result| result == expected)
         }
     }
 
@@ -149,7 +151,7 @@ mod tests {
             "nothing": null
         });
 
-        let result = substitute_params(payload, &params).unwrap();
+        let result = substitute_params(&payload, &params).unwrap();
 
         assert_eq!(
             result,
@@ -175,7 +177,7 @@ mod tests {
     fn reports_missing_placeholder_inside_nested_array() {
         let payload = json!({"items": [{"id": "{missing}"}]});
 
-        let error = substitute_params(payload, &HashMap::new()).unwrap_err();
+        let error = substitute_params(&payload, &HashMap::new()).unwrap_err();
 
         assert!(matches!(
             error.downcast_ref::<ResponseError>(),
@@ -203,7 +205,7 @@ mod tests {
             headers: Some(headers),
         };
 
-        let resp = build_response(res, None, Query(HashMap::new())).unwrap();
+        let resp = build_response(&res, None, Query(HashMap::new())).unwrap();
         assert_eq!(resp.status(), StatusCode::OK);
         let ct = resp
             .headers()
@@ -236,7 +238,7 @@ mod tests {
             headers: Some(headers),
         };
 
-        let resp = build_response(res, None, Query(HashMap::new())).unwrap();
+        let resp = build_response(&res, None, Query(HashMap::new())).unwrap();
         assert_eq!(resp.status(), StatusCode::CREATED);
         let ct = resp
             .headers()
@@ -258,7 +260,7 @@ mod tests {
             headers: None,
         };
 
-        let resp = build_response(res, None, Query(HashMap::new())).unwrap();
+        let resp = build_response(&res, None, Query(HashMap::new())).unwrap();
         assert_eq!(resp.status(), StatusCode::NO_CONTENT);
         let expected: Vec<u8> = Vec::new();
         assert!(expected.is_empty());
@@ -291,7 +293,7 @@ mod tests {
             ("region".to_string(), "west".to_string()),
         ]));
 
-        let response = build_response(res, path, query).unwrap();
+        let response = build_response(&res, path, query).unwrap();
         let body = axum::body::to_bytes(response.into_body(), usize::MAX)
             .await
             .unwrap();
@@ -321,7 +323,7 @@ mod tests {
             headers: None,
         };
 
-        let error = build_response(res, None, Query(HashMap::new())).unwrap_err();
+        let error = build_response(&res, None, Query(HashMap::new())).unwrap_err();
         assert!(matches!(
             error.downcast_ref::<ResponseError>(),
             Some(ResponseError::MissingPlaceholder(placeholder)) if placeholder == "missing"

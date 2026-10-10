@@ -10,7 +10,7 @@ use axum::{
 };
 use log::debug;
 use std::collections::HashMap;
-use std::pin::Pin;
+use std::future::{Ready, ready};
 
 pub(crate) type PathParams = Option<Path<HashMap<String, String>>>;
 pub(crate) type QueryParams = Query<HashMap<String, String>>;
@@ -18,29 +18,27 @@ pub(crate) type QueryParams = Query<HashMap<String, String>>;
 pub(crate) fn create_handler(
     url: String,
     res: model::stub_response::Response,
-) -> impl Fn(PathParams, QueryParams) -> Pin<Box<dyn Future<Output = axum::response::Response> + Send>>
-+ Clone {
+) -> impl Fn(PathParams, QueryParams) -> Ready<Response> + Clone {
     move |path_params, query_map| {
         debug!(
             "Url: {} | path params: {:?} | query: {:?}",
             url, path_params, query_map
         );
-        let res = res.clone();
-        Box::pin(async move {
-            build_response(res, path_params, query_map)
-                .await
-                .unwrap_or_else(|error| match error.downcast::<ResponseError>() {
+        ready(
+            build_response(res.clone(), path_params, query_map).unwrap_or_else(|error| {
+                match error.downcast::<ResponseError>() {
                     Ok(response_error) => response_error.into_response(),
                     Err(error) => {
                         log::error!("Failed to build stub response: {error:#}");
                         StatusCode::INTERNAL_SERVER_ERROR.into_response()
                     }
-                })
-        })
+                }
+            }),
+        )
     }
 }
 
-async fn build_response(
+fn build_response(
     res: StubResponse,
     path: PathParams,
     query: QueryParams,
@@ -73,6 +71,9 @@ fn substitute_params(
     params: &HashMap<String, String>,
 ) -> anyhow::Result<serde_json::Value> {
     match value {
+        serde_json::Value::String(text) if !text.contains('{') => {
+            Ok(serde_json::Value::String(text))
+        }
         serde_json::Value::String(text) => Ok(serde_json::Value::String(
             strfmt::strfmt(&text, params).map_err(ResponseError::from)?,
         )),
@@ -182,8 +183,8 @@ mod tests {
         ));
     }
 
-    #[tokio::test]
-    async fn plain_text_body_and_headers_applied() {
+    #[test]
+    fn plain_text_body_and_headers_applied() {
         let ct_key = "Content-Type";
         let ct_val = "text/plain";
         let x_key = "X-Custom";
@@ -202,9 +203,7 @@ mod tests {
             headers: Some(headers),
         };
 
-        let resp = build_response(res, None, Query(HashMap::new()))
-            .await
-            .unwrap();
+        let resp = build_response(res, None, Query(HashMap::new())).unwrap();
         assert_eq!(resp.status(), StatusCode::OK);
         let ct = resp
             .headers()
@@ -219,8 +218,8 @@ mod tests {
         assert_eq!(expected, "\"simple text\"");
     }
 
-    #[tokio::test]
-    async fn complex_json_body_is_serialized_and_headers_set() {
+    #[test]
+    fn complex_json_body_is_serialized_and_headers_set() {
         let payload = json!({
             "user": {"id": 1, "name": "Alice"},
             "roles": ["admin", "user"]
@@ -237,9 +236,7 @@ mod tests {
             headers: Some(headers),
         };
 
-        let resp = build_response(res, None, Query(HashMap::new()))
-            .await
-            .unwrap();
+        let resp = build_response(res, None, Query(HashMap::new())).unwrap();
         assert_eq!(resp.status(), StatusCode::CREATED);
         let ct = resp
             .headers()
@@ -253,17 +250,15 @@ mod tests {
         assert!(expected.contains("\"roles\""));
     }
 
-    #[tokio::test]
-    async fn no_body_returns_empty_response_and_respects_status() {
+    #[test]
+    fn no_body_returns_empty_response_and_respects_status() {
         let res = StubResponse {
             status: 204,
             body: None,
             headers: None,
         };
 
-        let resp = build_response(res, None, Query(HashMap::new()))
-            .await
-            .unwrap();
+        let resp = build_response(res, None, Query(HashMap::new())).unwrap();
         assert_eq!(resp.status(), StatusCode::NO_CONTENT);
         let expected: Vec<u8> = Vec::new();
         assert!(expected.is_empty());
@@ -296,7 +291,7 @@ mod tests {
             ("region".to_string(), "west".to_string()),
         ]));
 
-        let response = build_response(res, path, query).await.unwrap();
+        let response = build_response(res, path, query).unwrap();
         let body = axum::body::to_bytes(response.into_body(), usize::MAX)
             .await
             .unwrap();
@@ -318,17 +313,15 @@ mod tests {
         );
     }
 
-    #[tokio::test]
-    async fn missing_placeholder_returns_bad_request() {
+    #[test]
+    fn missing_placeholder_returns_bad_request() {
         let res = StubResponse {
             status: 200,
             body: Some(json!({"id": "{missing}"})),
             headers: None,
         };
 
-        let error = build_response(res, None, Query(HashMap::new()))
-            .await
-            .unwrap_err();
+        let error = build_response(res, None, Query(HashMap::new())).unwrap_err();
         assert!(matches!(
             error.downcast_ref::<ResponseError>(),
             Some(ResponseError::MissingPlaceholder(placeholder)) if placeholder == "missing"
